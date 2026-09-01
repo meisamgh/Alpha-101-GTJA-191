@@ -17,6 +17,7 @@ def make_return_targets(
     out = pd.DataFrame(index=p.index)
     _ = cost_bps  # retained for backward-compatible configs; targets are gross of costs
     trailing_beta = _trailing_beta(p, window=60)
+    trailing_sector_beta, sector_daily = _trailing_sector_beta(p, trailing_beta, window=60)
     vol = g.adjusted_close.pct_change(fill_method=None).groupby(level="symbol").transform(
         lambda x: x.rolling(volatility_window, min_periods=volatility_window).std()
     )
@@ -26,11 +27,11 @@ def make_return_targets(
         raw = exit_price / entry - 1
         market_future = _future_compound_return(p.get("market_return"), h)
         residual = raw - trailing_beta * market_future if market_future is not None else raw
-        if "sector" in p:
-            # Cross-sectional sector component on the target date. This uses future labels only to
-            # define the supervised target, never a feature; leave-one-out reduces self-influence.
-            sector_component = _leave_one_out_group_mean(residual, p["sector"])
-            residual = residual - sector_component.fillna(0)
+        if trailing_sector_beta is not None and sector_daily is not None:
+            future_sector = _future_compound_return(sector_daily, h)
+            if market_future is not None:
+                future_sector = future_sector - market_future
+            residual = residual - trailing_sector_beta * future_sector
         # Costs belong in signal selection and backtesting. Keep this continuous target gross.
         adjusted = residual / (vol * np.sqrt(max(h, 1))).replace(0, np.nan)
         out[f"raw_return_{h}d"] = raw
@@ -67,9 +68,20 @@ def _future_compound_return(market: pd.Series | None, horizon: int) -> pd.Series
     )
 
 
-def _leave_one_out_group_mean(values: pd.Series, sectors: pd.Series) -> pd.Series:
-    frame = pd.DataFrame({"value": values, "sector": sectors}, index=values.index)
-    keys = [frame.index.get_level_values("date"), frame.sector]
-    total = frame.value.groupby(keys).transform("sum")
-    count = frame.value.groupby(keys).transform("count")
-    return (total - frame.value) / (count - 1).replace(0, np.nan)
+def _trailing_sector_beta(
+    panel: pd.DataFrame, market_beta: pd.Series, window: int
+) -> tuple[pd.Series | None, pd.Series | None]:
+    if "sector" not in panel or "market_return" not in panel:
+        return None, None
+    stock = panel.groupby(level="symbol").adjusted_close.pct_change(fill_method=None)
+    keys = [panel.index.get_level_values("date"), panel.sector]
+    sector_return = stock.groupby(keys).transform("mean")
+    sector_excess = sector_return - panel.market_return
+    stock_excess = stock - market_beta * panel.market_return
+    covariance = stock_excess.groupby(level="symbol").transform(
+        lambda x: x.rolling(window, min_periods=30).cov(sector_excess.loc[x.index])
+    )
+    variance = sector_excess.groupby(level="symbol").transform(
+        lambda x: x.rolling(window, min_periods=30).var()
+    )
+    return covariance / variance.replace(0, np.nan), sector_return

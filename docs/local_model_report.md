@@ -17,28 +17,27 @@ net performance, then failed the terminal holdout materially. It should not be t
 | Horizon | 20 trading days |
 | Model | Ridge |
 | Features | 38 |
-| OOS Rank IC | 0.0218 |
-| OOS ICIR | 0.1619 |
-| Direction accuracy | 50.66% |
-| Gross CAGR | 0.76% |
-| Net CAGR at 10 bps | 0.13% |
-| Net Sharpe | 0.06 |
-| Sortino | 0.09 |
-| Maximum drawdown | -3.91% |
-| Mean two-way cohort turnover | 2.27% daily |
-| Trades | 8,806 |
+| OOS Rank IC | 0.0492 |
+| OOS ICIR | 0.2225 |
+| Direction accuracy | 51.92% |
+| Meta model | Triple-barrier LightGBM, probability > 0.60 |
+| Net CAGR at 10 bps | 0.09% |
+| Net Sharpe | 0.49 |
+| Maximum drawdown | -0.24% |
+| Mean two-way cohort turnover | 0.04% daily |
+| Trades | 502 |
 
 Signal construction was rank at least 0.90 plus predicted alpha above 0.05 for LONG, rank at most
 0.10 plus predicted alpha below -0.05 for SHORT, and NO TRADE otherwise. Positions used overlapping
 20-day cohorts, a 2% name cap, gross exposure no greater than one, and approximately neutral net
-exposure. The hard regime filter was not selected. Inverse-volatility, magnitude, and equal sizing
-converged because the 2% cap bound most selected names.
+exposure. The hard regime filter was not selected. The primary-only portfolio had -1.16% net CAGR
+and -0.33 Sharpe; meta-labeling was therefore selected from the research period.
 
 ## Model and horizon comparison
 
-The highest predictive IC was XGBoost at 10 days (Rank IC 0.0280, ICIR 0.2110), followed by
-LightGBM at 20 days (0.0269, 0.2302). These higher-IC models did not translate into positive
-cost-adjusted portfolios. One-day models were distinctly weaker (Rank IC 0.0052–0.0094).
+The highest predictive IC was Ridge at 20 days (Rank IC 0.0492, ICIR 0.2225), followed by XGBoost
+at 20 days (0.0413, 0.2087) and LightGBM at 20 days (0.0393, 0.1993). One-day models were distinctly
+weaker (Rank IC 0.0061–0.0105).
 
 The complete machine-readable comparison is in `artifacts/model_results.csv`; portfolio variants
 and 5/10/20/50 bps scenarios are in `artifacts/strategy_results.csv`.
@@ -46,9 +45,9 @@ and 5/10/20/50 bps scenarios are in `artifacts/strategy_results.csv`.
 ## Meta-labeling
 
 A LightGBM classifier was trained on prior OOS primary predictions and volatility-scaled
-triple-barrier outcomes. Research-period probability thresholds 0.50, 0.55, 0.60, and 0.65 all had
-negative net Sharpe. Threshold 0.70 admitted no trades and is treated as invalid, not as zero-risk
-performance. Meta-labeling did not improve the strategy.
+triple-barrier outcomes. The 0.60 research-period threshold produced 0.49 net Sharpe but only 0.09%
+CAGR and 502 trades. Threshold 0.70 admitted no trades and is treated as invalid, not as zero-risk
+performance. The frozen 0.60 threshold failed on the holdout, so meta-labeling did not establish edge.
 
 ## Baselines
 
@@ -61,15 +60,15 @@ comparisons reinforce that the ML strategy did not justify its turnover.
 
 | Item | Result |
 |---|---:|
-| Holdout Rank IC | 0.0135 |
-| Holdout top-minus-bottom target spread | -0.0173 |
-| Holdout gross CAGR | -4.73% |
-| Holdout net CAGR | -5.33% |
-| Holdout net Sharpe | -1.18 |
-| Holdout maximum drawdown | -15.16% |
+| Holdout Rank IC | 0.0487 |
+| Primary-model top-minus-bottom target spread | 0.1662 |
+| Meta-filtered net CAGR | -0.48% |
+| Meta-filtered net Sharpe | -1.80 |
+| Meta-filtered maximum drawdown | -0.90% |
+| Meta-accepted candidates | 2,783 |
 
-The negative top-minus-bottom spread despite positive mean daily rank IC is a warning that average
-ordering did not survive in the tradable tails. No parameter was retuned from these holdout results.
+Predictive ordering survived, but it did not convert into positive realized PnL under the frozen
+signal, cohort, meta, and cost rules. No parameter was retuned from these holdout results.
 
 ## Data and inference limitations
 

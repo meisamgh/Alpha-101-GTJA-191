@@ -1,6 +1,7 @@
 """Research-period baselines and meta-label diagnostics; never touches the final holdout."""
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -9,12 +10,16 @@ from lightgbm import LGBMClassifier
 from sklearn.impute import SimpleImputer
 
 from quant_research.backtest.engine import backtest_overlapping_cohorts, performance_metrics
+from quant_research.backtest.metrics import prediction_metrics
 from quant_research.data.public import download_sp500_panel
 from quant_research.experiments.local_research import (
     RESEARCH_TEST_YEARS,
+    _model_spec,
     candidate_weights,
     expanding_predictions,
+    make_leaderboard,
 )
+from quant_research.models.train import build_model
 from quant_research.portfolio.construction import PortfolioConstraints, construct_weights
 from quant_research.targets.returns import make_return_targets
 from quant_research.targets.triple_barrier import triple_barrier_labels
@@ -41,6 +46,17 @@ def run(output_dir: Path = Path("artifacts")) -> None:
     strategies = strategies[strategies.meta_model == "none"]
     strategies = pd.concat([strategies, pd.DataFrame(meta_rows)], ignore_index=True)
     strategies.to_csv(strategy_path, index=False)
+    models = pd.read_csv(output_dir / "model_results.csv")
+    leaderboard = make_leaderboard(models, strategies)
+    leaderboard.to_csv(output_dir / "leaderboard.csv", index=False)
+    best = leaderboard.iloc[0]
+    threshold = float(str(best.meta_model).split(">")[-1])
+    holdout = evaluate_meta_holdout(panel, features, targets, prediction, threshold)
+    final_path = output_dir / "final_model.json"
+    final = json.loads(final_path.read_text())
+    final["best_research_configuration"] = best.to_dict()
+    final["final_holdout"] = holdout
+    final_path.write_text(json.dumps(final, indent=2, default=str))
 
 
 def run_meta(
@@ -93,6 +109,87 @@ def run_meta(
                          "meta_model": f"triple_barrier_lgbm_p>{threshold:.2f}",
                          "position_sizing": "equal", "cost_bps": cost, **result.metrics})
     return rows
+
+
+def evaluate_meta_holdout(
+    panel: pd.DataFrame,
+    features: pd.DataFrame,
+    targets: pd.DataFrame,
+    research_prediction: pd.Series,
+    threshold: float,
+) -> dict[str, float]:
+    """Fit the frozen primary/meta configuration and evaluate the terminal holdout."""
+    row_dates = features.index.get_level_values("date")
+    target = targets.vol_adjusted_return_20d
+    label_end = targets.label_end_20d
+    train = (row_dates < "2024-01-01") & (label_end < pd.Timestamp("2024-01-01"))
+    holdout = row_dates >= "2025-01-01"
+    columns = features.columns[features.loc[train].notna().mean() >= 0.70]
+    valid = target.loc[train].notna()
+    primary = build_model(_model_spec("ridge")).fit(
+        features.loc[train, columns].loc[valid], target.loc[train].loc[valid]
+    )
+    holdout_prediction = pd.Series(
+        primary.predict(features.loc[holdout, columns]),
+        index=features.loc[holdout].index,
+        name="prediction",
+    )
+    research_meta = _meta_frame(panel, features, research_prediction, with_labels=True)
+    holdout_meta = _meta_frame(panel, features, holdout_prediction, with_labels=False)
+    meta_columns = [column for column in holdout_meta.columns if column != "success"]
+    imputer = SimpleImputer(strategy="median")
+    x_train = imputer.fit_transform(research_meta[meta_columns])
+    x_holdout = imputer.transform(holdout_meta[meta_columns])
+    classifier = LGBMClassifier(
+        n_estimators=120,
+        learning_rate=0.03,
+        num_leaves=15,
+        reg_lambda=10,
+        random_state=42,
+        verbosity=-1,
+    )
+    classifier.fit(x_train, research_meta.success)
+    probability = pd.Series(classifier.predict_proba(x_holdout)[:, 1], index=holdout_meta.index)
+    accepted = probability.reindex(holdout_prediction.index).fillna(0) > threshold
+    filtered = holdout_prediction.where(accepted)
+    weights = candidate_weights(
+        filtered, features.realized_vol_20d.reindex(filtered.index), 0.05, "equal"
+    )
+    holdout_panel = panel.loc[panel.index.get_level_values("date") >= "2025-01-01"]
+    result = backtest_overlapping_cohorts(holdout_panel, weights, 20, cost_bps=10)
+    return {
+        **prediction_metrics(holdout_prediction, target.reindex(holdout_prediction.index)),
+        **{f"strategy_{key}": value for key, value in result.metrics.items()},
+        "meta_threshold": threshold,
+        "meta_accepted_candidates": int(accepted.sum()),
+    }
+
+
+def _meta_frame(
+    panel: pd.DataFrame,
+    features: pd.DataFrame,
+    prediction: pd.Series,
+    with_labels: bool,
+) -> pd.DataFrame:
+    ranks = prediction.groupby(level="date").rank(pct=True)
+    candidate = ((ranks >= 0.9) | (ranks <= 0.1)) & (prediction.abs() > 0.05)
+    index = prediction.index[candidate]
+    meta = pd.DataFrame(index=index)
+    meta["primary_prediction"] = prediction.reindex(index)
+    meta["prediction_rank"] = ranks.reindex(index)
+    meta["prediction_magnitude"] = meta.primary_prediction.abs()
+    for column in (
+        "adx_14", "atr_14", "bollinger_width_20", "realized_vol_20d",
+        "volume_surprise", "adv_20", "volatility_percentile_252",
+    ):
+        meta[column] = features[column].reindex(index)
+    if with_labels:
+        barriers = triple_barrier_labels(panel, index, horizon=20, pt=1.5, sl=1.0)
+        meta = meta.reindex(barriers.index)
+        meta["success"] = (
+            barriers.label * np.sign(meta.primary_prediction) > 0
+        ).astype(int)
+    return meta
 
 
 def run_baselines(panel: pd.DataFrame, features: pd.DataFrame) -> list[dict[str, object]]:
