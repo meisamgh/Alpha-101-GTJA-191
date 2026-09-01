@@ -7,6 +7,10 @@ after costs**? It prioritizes causal alignment and reproducibility over headline
 > Current conclusion: **No evidence of tradable alpha.** No real point-in-time panel or frozen
 > holdout is bundled. The deterministic synthetic run is a CI check, not a backtest.
 
+The local public-data research run is now complete. It found weak predictive IC but negative terminal
+holdout performance, so the current conclusion remains **NO EDGE**. See
+[`docs/local_model_report.md`](docs/local_model_report.md) for the measured results.
+
 ## Architecture
 
 ```mermaid
@@ -74,3 +78,14 @@ neighbors. Benchmark SPY, equal weight, momentum, and mean reversion. Account fo
 See [the audit](docs/research_audit.md) and [research report](docs/final_research_report.md) for the
 full evidence boundary and unresolved institutional-data, borrow, impact, capacity, and factor-validation
 limitations.
+
+To reproduce the executed local public-data fallback (no GitHub workflow or remote execution):
+
+```bash
+.venv/bin/pip install -e '.[dev,research]' yfinance lxml xgboost lightgbm
+.venv/bin/python -m quant_research.experiments.local_research --output-dir artifacts
+.venv/bin/python -m quant_research.experiments.supplementary
+```
+
+The first invocation downloads and caches adjusted data for 300 current S&P 500 members. This is
+explicitly survivorship-biased and must not be described as point-in-time research.

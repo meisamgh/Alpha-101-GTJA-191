@@ -1,0 +1,79 @@
+{
+  "best_research_configuration": {
+    "model": "ridge",
+    "horizon": 20,
+    "regime": "none",
+    "meta_model": "none",
+    "position_sizing": "inverse_volatility",
+    "cost_bps": 10,
+    "cagr": 0.00129518121972505,
+    "annual_volatility": 0.02692458755221194,
+    "sharpe": 0.06151497847884471,
+    "sortino": 0.09301971661448999,
+    "max_drawdown": -0.03908775644153584,
+    "cost_drag": 0.01933717857142857,
+    "turnover": 0.022725161290322583,
+    "number_of_trades": 8806.0,
+    "gross_cagr": 0.00761078210843924,
+    "feature_count": 38,
+    "train_period": "2014-01-02..2022-12-01",
+    "test_period": "2022-2024",
+    "rank_ic": 0.021838169968001888,
+    "pearson_ic": 0.01616686308073203,
+    "icir": 0.16188525714690064,
+    "direction_accuracy": 0.5066262898160611,
+    "prediction_target_correlation": 0.016855745263217783,
+    "top_decile_alpha": 0.0658246867231566,
+    "bottom_decile_alpha": -0.023432170829807687,
+    "top_bottom_spread": 0.08925685755296428,
+    "fold_rank_ic_std": 0.042635153541061496,
+    "cost_sensitivity": 0.9569827068154911,
+    "robustness_score": 0.28042608963716253
+  },
+  "final_holdout": {
+    "rank_ic": 0.01347272767285525,
+    "pearson_ic": -0.005394309847265869,
+    "icir": 0.08670685401688959,
+    "direction_accuracy": 0.5034175659522887,
+    "prediction_target_correlation": 0.008523040316998636,
+    "top_decile_alpha": -0.00016290014276128554,
+    "bottom_decile_alpha": 0.01716356884760851,
+    "top_bottom_spread": -0.01733657362709152,
+    "strategy_cagr": -0.053295302923841215,
+    "strategy_annual_volatility": 0.04554286878822968,
+    "strategy_sharpe": -1.1797061905587132,
+    "strategy_sortino": -1.6439773229342258,
+    "strategy_max_drawdown": -0.15157707074162474,
+    "strategy_cost_drag": 0.010387035714285715,
+    "strategy_turnover": 0.022762019230769235,
+    "strategy_number_of_trades": 4850.0,
+    "strategy_gross_cagr": -0.0473182322971758
+  },
+  "data_disclosure": "Current S&P 500 members; survivorship and membership look-ahead bias",
+  "trusted_factors": [
+    {
+      "name": "alpha_012",
+      "family": "Alpha101",
+      "formula_reference": "sign(delta(volume,1)) * -delta(close,1)",
+      "trailing_only": true
+    },
+    {
+      "name": "alpha_101",
+      "family": "Alpha101",
+      "formula_reference": "(close-open)/(high-low+0.001)",
+      "trailing_only": true
+    },
+    {
+      "name": "gtja_002",
+      "family": "GTJA191",
+      "formula_reference": "-delta(((C-L)-(H-C))/(H-L),1)",
+      "trailing_only": true
+    },
+    {
+      "name": "gtja_012",
+      "family": "GTJA191",
+      "formula_reference": "-rank(open-mean(vwap,10))*rank(abs(C-vwap))",
+      "trailing_only": true
+    }
+  ]
+}
