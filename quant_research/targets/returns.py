@@ -15,6 +15,7 @@ def make_return_targets(
     p = panel.sort_index()
     g = p.groupby(level="symbol", group_keys=False)
     out = pd.DataFrame(index=p.index)
+    _ = cost_bps  # retained for backward-compatible configs; targets are gross of costs
     trailing_beta = _trailing_beta(p, window=60)
     vol = g.adjusted_close.pct_change(fill_method=None).groupby(level="symbol").transform(
         lambda x: x.rolling(volatility_window, min_periods=volatility_window).std()
@@ -30,7 +31,8 @@ def make_return_targets(
             # define the supervised target, never a feature; leave-one-out reduces self-influence.
             sector_component = _leave_one_out_group_mean(residual, p["sector"])
             residual = residual - sector_component.fillna(0)
-        adjusted = (residual - cost_bps / 10_000) / (vol * np.sqrt(max(h, 1))).replace(0, np.nan)
+        # Costs belong in signal selection and backtesting. Keep this continuous target gross.
+        adjusted = residual / (vol * np.sqrt(max(h, 1))).replace(0, np.nan)
         out[f"raw_return_{h}d"] = raw
         out[f"residual_return_{h}d"] = residual
         out[f"vol_adjusted_return_{h}d"] = adjusted

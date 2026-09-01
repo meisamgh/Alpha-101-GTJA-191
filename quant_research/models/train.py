@@ -6,7 +6,7 @@ from typing import Any
 
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import SimpleImputer
-from sklearn.linear_model import Ridge
+from sklearn.linear_model import ElasticNet, Ridge
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -23,11 +23,17 @@ def build_model(spec: ModelSpec) -> Any:
         return Pipeline([("imputer", SimpleImputer(strategy="median")),
                          ("scaler", StandardScaler()),
                          ("model", Ridge(**{"alpha": 10.0, **spec.params}))])
-    if spec.name == "random_forest":
+    if spec.name == "elastic_net":
         return Pipeline([("imputer", SimpleImputer(strategy="median")),
-                         ("model", RandomForestRegressor(
-                             n_estimators=200, max_depth=6, n_jobs=-1,
-                             random_state=spec.seed, **spec.params))])
+                         ("scaler", StandardScaler()),
+                         ("model", ElasticNet(**{"alpha": 0.001, "l1_ratio": 0.1,
+                                                  "max_iter": 2_000,
+                                                  "random_state": spec.seed, **spec.params}))])
+    if spec.name == "random_forest":
+        defaults = {"n_estimators": 200, "max_depth": 6, "n_jobs": -1,
+                    "random_state": spec.seed}
+        return Pipeline([("imputer", SimpleImputer(strategy="median")),
+                         ("model", RandomForestRegressor(**{**defaults, **spec.params}))])
     if spec.name in {"xgboost", "lightgbm"}:
         module, cls_name = (("xgboost", "XGBRegressor") if spec.name == "xgboost" else
                             ("lightgbm", "LGBMRegressor"))
@@ -35,8 +41,10 @@ def build_model(spec: ModelSpec) -> Any:
             cls = getattr(__import__(module, fromlist=[cls_name]), cls_name)
         except ImportError as exc:
             raise ImportError(f"install the research extra to use {spec.name}") from exc
-        defaults = {"n_estimators": 300, "max_depth": 4, "learning_rate": 0.03,
-                    "random_state": spec.seed, "n_jobs": 1}
+        defaults = {"n_estimators": 200, "max_depth": 4, "learning_rate": 0.03,
+                    "random_state": spec.seed, "n_jobs": -1}
+        if spec.name == "lightgbm":
+            defaults.update({"num_leaves": 31, "verbosity": -1})
         return Pipeline([("imputer", SimpleImputer(strategy="median")),
                          ("model", cls(**{**defaults, **spec.params}))])
     raise ValueError(f"unknown model: {spec.name}")

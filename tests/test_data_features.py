@@ -19,6 +19,15 @@ def test_features_do_not_change_when_future_is_perturbed(panel):
     pd.testing.assert_frame_equal(baseline, compute_features(changed).loc[:cutoff])
 
 
+def test_trusted_factors_do_not_change_when_future_is_perturbed(panel):
+    cutoff = panel.index.get_level_values("date").unique()[90]
+    changed = panel.copy()
+    future = changed.index.get_level_values("date") > cutoff
+    changed.loc[future, ["open", "high", "low", "close", "adjusted_close", "volume"]] *= 7
+    for compute in (compute_alpha_features, compute_gtja_features):
+        pd.testing.assert_frame_equal(compute(panel).loc[:cutoff], compute(changed).loc[:cutoff])
+
+
 def test_representative_alpha_formulas(panel):
     a = compute_alpha_features(panel)
     row = panel.index[50]

@@ -41,25 +41,35 @@ def construct_weights(
             raw *= 1 / volatility.reindex(raw.index).clip(lower=1e-6)
         if confidence is not None:
             raw *= confidence.reindex(raw.index).clip(0, 1).fillna(0)
-        raw = _normalize_sides(raw, constraints)
-        weights.loc[raw.index] = raw.clip(-constraints.max_weight, constraints.max_weight)
-        # Re-normalize after caps when feasible, without ever violating the cap.
-        weights.loc[raw.index] = _normalize_sides(weights.loc[raw.index], constraints).clip(
-            -constraints.max_weight, constraints.max_weight
-        )
+        weights.loc[raw.index] = _normalize_sides(raw, constraints)
     return weights
 
 
 def _normalize_sides(raw: pd.Series, c: PortfolioConstraints) -> pd.Series:
     if c.long_only:
-        total = raw.clip(lower=0).sum()
-        return raw.clip(lower=0) * (c.gross_exposure / total if total else 0)
+        return _capped_allocation(raw.clip(lower=0), c.gross_exposure, c.max_weight)
     long_budget = (c.gross_exposure + c.net_exposure) / 2
     short_budget = (c.gross_exposure - c.net_exposure) / 2
     result = pd.Series(0.0, index=raw.index)
     positive, negative = raw.clip(lower=0), -raw.clip(upper=0)
-    if positive.sum():
-        result += positive / positive.sum() * long_budget
-    if negative.sum():
-        result -= negative / negative.sum() * short_budget
+    result += _capped_allocation(positive, long_budget, c.max_weight)
+    result -= _capped_allocation(negative, short_budget, c.max_weight)
     return result.replace([np.inf, -np.inf], 0)
+
+
+def _capped_allocation(scores: pd.Series, budget: float, cap: float) -> pd.Series:
+    """Allocate proportionally with iterative redistribution around a hard name cap."""
+    result = pd.Series(0.0, index=scores.index)
+    remaining = scores[scores > 0].astype(float)
+    residual_budget = min(budget, len(remaining) * cap)
+    while len(remaining) and residual_budget > 1e-12:
+        proposal = remaining / remaining.sum() * residual_budget
+        capped = proposal >= cap
+        if not capped.any():
+            result.loc[remaining.index] += proposal
+            break
+        names = proposal.index[capped]
+        result.loc[names] = cap
+        residual_budget = budget - result.sum()
+        remaining = remaining.drop(names)
+    return result

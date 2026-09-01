@@ -20,6 +20,12 @@ def test_cross_sectional_rank_range(panel):
     assert ranks.between(0, 1).all()
 
 
+def test_continuous_target_is_not_modified_by_cost_argument(panel):
+    gross = make_return_targets(panel, (5,), cost_bps=0)["vol_adjusted_return_5d"]
+    costly = make_return_targets(panel, (5,), cost_bps=50)["vol_adjusted_return_5d"]
+    assert gross.equals(costly)
+
+
 def test_triple_barrier_is_bounded_by_vertical_window(panel):
     events = panel.index[80:100:5]
     labels = triple_barrier_labels(panel, events, horizon=5, volatility_window=20)

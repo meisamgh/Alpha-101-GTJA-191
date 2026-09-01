@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from quant_research.backtest.engine import backtest
+from quant_research.backtest.engine import backtest, backtest_overlapping_cohorts
 from quant_research.portfolio.construction import PortfolioConstraints, construct_weights
 
 
@@ -29,3 +29,15 @@ def test_signal_executes_at_next_open(panel):
     next_intraday = (panel.close / panel.open - 1).groupby(level="symbol").shift(-1)
     expected = (weights * next_intraday).groupby(level="date").sum(min_count=1).fillna(0)
     pd.testing.assert_series_equal(result.daily.gross_return, expected, check_names=False)
+
+
+def test_multiday_backtest_holds_overlapping_cohorts(panel):
+    dates = panel.index.get_level_values("date").unique()
+    symbol = panel.index.get_level_values("symbol").unique()[0]
+    weights = pd.Series(0.0, index=panel.index)
+    weights.loc[(dates[40], symbol)] = 1.0
+    result = backtest_overlapping_cohorts(panel, weights, horizon=5, cost_bps=0)
+    nonzero = result.daily.gross_return.ne(0)
+    assert nonzero.sum() == 5
+    assert nonzero.index[nonzero][0] == dates[41]
+    assert nonzero.index[nonzero][-1] == dates[45]

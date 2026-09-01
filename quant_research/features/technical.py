@@ -30,6 +30,19 @@ def compute_features(panel: pd.DataFrame) -> pd.DataFrame:
     out["atr_14"] = tr.groupby(level="symbol").transform(
         lambda x: x.rolling(14, min_periods=14).mean()
     ) / close
+    up_move = p.high.groupby(level="symbol").diff()
+    down_move = -p.low.groupby(level="symbol").diff()
+    plus_dm = up_move.where((up_move > down_move) & (up_move > 0), 0.0)
+    minus_dm = down_move.where((down_move > up_move) & (down_move > 0), 0.0)
+    atr_raw = tr.groupby(level="symbol").transform(lambda x: x.rolling(14).mean())
+    plus_di = 100 * plus_dm.groupby(level="symbol").transform(
+        lambda x: x.rolling(14).mean()
+    ) / atr_raw
+    minus_di = 100 * minus_dm.groupby(level="symbol").transform(
+        lambda x: x.rolling(14).mean()
+    ) / atr_raw
+    dx = 100 * (plus_di - minus_di).abs() / (plus_di + minus_di).replace(0, np.nan)
+    out["adx_14"] = dx.groupby(level="symbol").transform(lambda x: x.rolling(14).mean())
     log_hl = np.log(p.high / p.low).pow(2)
     out["parkinson_vol_20d"] = np.sqrt(_grolling(log_hl, 20, "mean") / (4 * np.log(2)))
     out["downside_vol_20d"] = ret1.where(ret1 < 0, 0).groupby(level="symbol").transform(
@@ -54,6 +67,9 @@ def compute_features(panel: pd.DataFrame) -> pd.DataFrame:
     out["rolling_range_20"] = high20 / low20 - 1
     out["breakout_strength_20"] = (close - low20) / (high20 - low20).replace(0, np.nan)
     out["trend_strength_20"] = out["ma_slope_20"].abs() / out["realized_vol_20d"]
+    out["volatility_percentile_252"] = out["realized_vol_20d"].groupby(
+        level="symbol"
+    ).transform(lambda x: x.rolling(252, min_periods=60).rank(pct=True))
     if "market_return" in p:
         market = p["market_return"]
         cov = ret1.groupby(level="symbol").transform(
@@ -66,4 +82,12 @@ def compute_features(panel: pd.DataFrame) -> pd.DataFrame:
         out["market_relative_momentum_20"] = out["momentum_20d"] - market.groupby(
             level="symbol"
         ).transform(lambda x: (1 + x).rolling(20).apply(np.prod, raw=True) - 1)
+        out["residual_momentum_20"] = out["momentum_20d"] - out["beta_60"] * market.groupby(
+            level="symbol"
+        ).transform(lambda x: (1 + x).rolling(20).apply(np.prod, raw=True) - 1)
+    if "sector" in p:
+        sector_momentum = out["momentum_20d"].groupby(
+            [p.index.get_level_values("date"), p.sector]
+        ).transform("mean")
+        out["sector_relative_momentum_20"] = out["momentum_20d"] - sector_momentum
     return out.replace([np.inf, -np.inf], np.nan)
