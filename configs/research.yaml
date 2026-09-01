@@ -1,0 +1,31 @@
+experiment_id: residual-rank-ridge-5d-v1
+dataset:
+  path: data/panel.parquet
+  version: UNCONFIGURED
+  universe: UNCONFIGURED_POINT_IN_TIME_UNIVERSE
+target:
+  type: residual_rank
+  horizon: 5
+  volatility_window: 20
+model:
+  name: ridge
+  params:
+    alpha: 10.0
+portfolio:
+  long_quantile: 0.90
+  short_quantile: 0.10
+  gross_exposure: 1.0
+  net_exposure: 0.0
+  max_weight: 0.05
+  long_only: false
+costs:
+  total_bps: 10.0
+  commission_bps: 2.0
+  slippage_bps: 8.0
+validation:
+  min_train_dates: 80
+  validation_dates: 20
+  test_dates: 20
+  step_dates: 20
+  embargo_days: 2
+output_dir: artifacts/experiments
