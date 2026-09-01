@@ -1,0 +1,25 @@
+name: quant-research-ci
+
+on:
+  push:
+    branches: [master, afml-research-upgrade]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements-modern.txt
+      - name: Compile
+        run: python -m py_compile quant_research/pipeline.py example_modern_pipeline.py
+      - name: Test
+        run: pytest -q
+      - name: Smoke-test example
+        run: python example_modern_pipeline.py
