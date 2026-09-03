@@ -1,0 +1,39 @@
+{
+  "trading_enabled": false,
+  "status": "NO_TRADE_RESEARCH_GATE_FAILED",
+  "selected_threshold": {
+    "threshold": 0.1,
+    "rank_ic": 0.04923337670702696,
+    "cagr_10bps": 0.0035778205260967866,
+    "sharpe_10bps": 0.5021602317081072,
+    "sharpe_20bps": 0.30180599809419273,
+    "max_drawdown": -0.01274656416094011,
+    "turnover": 0.005694741557192427,
+    "number_of_trades": 6222.0,
+    "robustness_score": 0.2884899597775334
+  },
+  "post_selection_diagnostic": {
+    "rank_ic": 0.04870591264691467,
+    "pearson_ic": 0.023509408418861663,
+    "icir": 0.23710269965513642,
+    "direction_accuracy": 0.5209852017710735,
+    "prediction_target_correlation": 0.051722732053121126,
+    "top_decile_alpha": 0.15587373566971485,
+    "bottom_decile_alpha": -0.01035337761269822,
+    "top_bottom_spread": 0.16624789380703908,
+    "cagr": -0.00411461516701217,
+    "annual_volatility": 0.008450665612268546,
+    "sharpe": -0.48368295456061755,
+    "sortino": -0.625626660613299,
+    "max_drawdown": -0.021771590312979594,
+    "cost_drag": 0.002544450922064196,
+    "turnover": 0.00557577227511011,
+    "number_of_trades": 3794.0,
+    "gross_cagr": -0.002578385561568197
+  },
+  "model": "ridge",
+  "horizon": 20,
+  "execution": "signal after close t; entry open t+1; exit close t+20",
+  "portfolio": "market-beta and sector neutral; gross <= 1; max name weight 2%",
+  "data_warning": "current S&P 500 membership; survivorship-biased public fallback"
+}
