@@ -11,6 +11,10 @@ The local public-data research run is now complete. It found weak predictive IC 
 holdout performance, so the current conclusion remains **NO EDGE**. See
 [`docs/local_model_report.md`](docs/local_model_report.md) for the measured results.
 
+The repository also includes a non-live offline trader. It produces shadow candidates but forces
+every final decision to `NO_TRADE` while the diagnostic profitability gate is failing. See
+[`docs/offline_trader.md`](docs/offline_trader.md).
+
 ## Architecture
 
 ```mermaid
@@ -54,8 +58,7 @@ formula test and a causality test.
 ```bash
 python -m venv .venv
 .venv/bin/pip install -e '.[dev]'
-.venv/bin/ruff check quant_research tests
-.venv/bin/pytest
+make validate
 .venv/bin/python -m quant_research.experiments.runner --smoke
 ```
 
@@ -85,6 +88,7 @@ To reproduce the executed local public-data fallback (no GitHub workflow or remo
 .venv/bin/pip install -e '.[dev,research]' yfinance lxml xgboost lightgbm
 .venv/bin/python -m quant_research.experiments.local_research --output-dir artifacts
 .venv/bin/python -m quant_research.experiments.supplementary
+make trader
 ```
 
 The first invocation downloads and caches adjusted data for 300 current S&P 500 members. This is

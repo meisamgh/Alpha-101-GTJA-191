@@ -78,3 +78,11 @@ spread, auction, locate, delisting, borrow, and market-impact histories are unav
 linear approximation. Only four Alpha-101/GTJA-191 factors passed the trusted registry; the legacy
 catalogs remain quarantined. These limitations would normally bias results upward, making the failed
 holdout more—not less—important.
+
+## Neutral offline-trader iteration
+
+A subsequent primary-only iteration projected weights off net, market-beta, and sector exposures.
+The research period selected an absolute-alpha threshold of 0.10, with 0.36% net CAGR and 0.50
+Sharpe at 10 bps and 0.30 Sharpe at 20 bps. The post-selection 2025–2026 diagnostic returned -0.41%
+CAGR and -0.48 Sharpe. The offline trader therefore remains disabled and emits final `NO_TRADE`
+decisions. This iteration improved exposure control but did not establish a durable economic edge.
